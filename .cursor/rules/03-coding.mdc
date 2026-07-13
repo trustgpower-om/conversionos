@@ -1,0 +1,34 @@
+---
+description: Coding, naming, security, and agent conventions for ConversionOS
+alwaysApply: true
+---
+
+# Coding Rules
+
+- TypeScript strict — no `any`
+- Server Components by default — `'use client'` only when `useState` / `useEffect` is required
+- Dynamic routes: `await params` (Next.js 14+)
+- Tracking via `/api/track` must never block page render (fire-and-forget / background)
+- Env vars only via `lib/env.ts` (validated at startup)
+- No placeholder stubs — implement fully or omit
+- Use pnpm for installs (`pnpm add <package>`); before adding a package, run `pnpm list <package>` to confirm it is installed
+
+## Naming
+
+- Tables: snake_case (`profiles`, `landing_pages`, `visits`, `leads`, `payout_periods`)
+- Types: PascalCase (`Profile`, `Landing`, `Visit`, `Lead`)
+- API routes: kebab-case (`/api/track/pageview`, `/api/leads/submit`)
+- Components: PascalCase files under `/components/`
+
+## Security
+
+- Never expose Bitrix webhook URL or Supabase `service_role` in client code
+- Store IP as SHA-256 hash, never raw
+- Bitrix webhook endpoints must verify shared secret
+- Lead form submissions: rate-limit max 3/minute per IP
+
+## Agent Behavior
+
+- Prefer targeted edits; for files over ~300 lines, use search/replace-style changes, not full rewrites
+- If unsure about schema, check `lib/supabase/types.ts`
+- If unsure about Bitrix, check `lib/bitrix/client.ts`

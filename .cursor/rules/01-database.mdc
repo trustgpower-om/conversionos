@@ -1,0 +1,49 @@
+---
+description: Supabase schema, query, and client conventions for ConversionOS
+globs: lib/supabase/**/*.{ts,tsx},app/api/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Database Rules
+
+## Clients
+
+- Server Components / Route Handlers: `lib/supabase/server.ts`
+- Client Components: `lib/supabase/client.ts`
+- Privileged jobs only: `lib/supabase/admin.ts` (`service_role`, bypasses RLS) — API routes, Edge, payout engine
+- Never import admin into Client Components or any browser bundle (`server-only` enforced)
+- Access DB only through typed Supabase clients — no raw SQL strings in components
+
+## Schema
+
+Before assuming column names, check `lib/supabase/types.ts`.
+
+| Table | Purpose |
+| --- | --- |
+| `profiles` | Marketing accounts (slug, commission_rate) |
+| `landing_pages` | Puck pages at `/l/{profile}/{landing}` |
+| `visits` | Pageviews (session_id, referrer, device) |
+| `leads` | Form submissions (session_id, bitrix_lead_id) |
+| `payout_periods` | Per-profile payout windows |
+
+Types: PascalCase (`Profile`, `Landing`, `Visit`, `Lead`). Tables: snake_case.
+
+## Queries
+
+Always select explicit columns — never `.select('*')` in production.
+
+```typescript
+// ❌ BAD
+const { data } = await supabase.from('leads').select('*')
+
+// ✅ GOOD
+const { data } = await supabase
+  .from('leads')
+  .select('id, session_id, bitrix_lead_id, deal_value, converted_at')
+```
+
+## Security
+
+- Hash IPs (SHA-256) before storage — never store raw IPs
+- Do not put Supabase `service_role` key in client components
+- Enable RLS on all tables used from the browser; use anon/publishable key there

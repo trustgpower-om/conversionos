@@ -1,0 +1,25 @@
+---
+description: Bitrix24 API, webhooks, and lead sync conventions
+globs: lib/bitrix/**/*.{ts,tsx},app/api/webhooks/**/*.{ts,tsx},app/api/leads/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Bitrix24 Rules
+
+## API Access
+
+- All Bitrix calls go through `lib/bitrix/client.ts` — never inline `fetch` to the Bitrix URL
+- If unsure about the API shape, check `lib/bitrix/client.ts` before adding new methods
+- NEVER expose the Bitrix webhook URL in client-side code
+
+## Lead Sync
+
+- Form submit creates a Lead row AND calls `crm.lead.add`
+- Store returned Bitrix id on the Lead as `bitrix_lead_id`
+- Lead must keep `session_id` for attribution back to Visit / Profile
+
+## Webhooks
+
+- Endpoint: `/app/api/webhooks/bitrix/`
+- Verify shared secret header on every request
+- On `ONCRMDEALUPDATE` with stage WON: find Lead by `bitrix_lead_id` and mark converted

@@ -1,0 +1,45 @@
+---
+description: ConversionOS project overview, stack, architecture, and business rules
+alwaysApply: true
+---
+
+# ConversionOS
+
+Landing Page Attribution & Payout Platform for a real estate agency.
+Marketing profiles (social accounts) drive traffic to custom landing pages.
+Form submissions become Bitrix24 leads; the system attributes each lead to a profile and calculates payouts.
+
+## Stack
+
+- Next.js 14 (App Router, TypeScript)
+- Supabase (PostgreSQL + Auth + Storage + Realtime)
+- Puck (`@measured-co/puck`) for landing editing
+- Tailwind CSS + shadcn/ui
+- pnpm · Vercel
+
+## Architecture
+
+- `/app/(dashboard)/` — Protected admin panel (auth required)
+- `/app/l/[profile]/[landing]/` — Public landings (SSR, SEO)
+- `/app/api/track/` — Server-side tracking (visit, lead)
+- `/app/api/webhooks/bitrix/` — Bitrix24 outgoing webhook events
+- `/app/api/leads/` — Lead submission and Bitrix sync
+- `/lib/supabase/` — Supabase clients (server, client, admin)
+- `/lib/bitrix/` — Bitrix24 API wrapper
+- `/lib/puck/` — Puck config and custom blocks
+
+## Core Entities
+
+- **Profile** — Marketing account; `slug` in URLs; `commission_rate`
+- **Landing** — Page at `/l/{profile_slug}/{landing_slug}`; Puck JSON blocks
+- **Visit** — Pageview; `session_id`, referrer, device
+- **Lead** — Form submit; `bitrix_lead_id`, optional `bitrix_deal_id`
+- **Payout** — Per profile per period from converted leads × `deal_value` × `commission_rate`
+
+## Key Business Rules
+
+- Every visit to `/l/{profile}/{landing}` creates a Visit before render
+- Every form submit creates a Lead AND calls Bitrix `crm.lead.add`
+- Lead stores `session_id` (links Visit → Profile)
+- On Bitrix `ONCRMDEALUPDATE` with stage WON: find Lead by `bitrix_lead_id`, mark converted
+- Payout = `SUM(deal_value) × commission_rate` for converted leads in the period, per profile
