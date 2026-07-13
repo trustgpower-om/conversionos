@@ -1,3 +1,5 @@
+import 'server-only'
+
 function required(name: string): string {
   const value = process.env[name]
   if (!value) {
@@ -6,6 +8,11 @@ function required(name: string): string {
   return value
 }
 
+/**
+ * Server-only env. Includes secrets (service_role, Bitrix, IP salt).
+ * Do not import from Client Components — use NEXT_PUBLIC_* via process.env there
+ * (see `lib/supabase/client.ts`).
+ */
 export const env = {
   supabaseUrl: required('NEXT_PUBLIC_SUPABASE_URL'),
   supabaseAnonKey: required('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
