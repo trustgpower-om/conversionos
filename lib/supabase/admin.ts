@@ -3,6 +3,7 @@ import 'server-only'
 import { createClient } from '@supabase/supabase-js'
 
 import { env } from '@/lib/env'
+import type { Database } from '@/lib/supabase/types'
 
 /**
  * Admin Supabase client — `service_role` key, full DB access, **bypasses RLS**.
@@ -12,11 +13,8 @@ import { env } from '@/lib/env'
  *
  * Importing this file into client code fails the build via `server-only`.
  */
-export function createAdminSupabaseClient() {
-  return createClient(env.supabaseUrl, env.supabaseServiceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  })
-}
+export const supabaseAdminClient = createClient<Database>(
+  env.supabaseUrl,
+  env.supabaseServiceRoleKey,
+  { auth: { persistSession: false } },
+)

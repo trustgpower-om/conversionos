@@ -2,6 +2,9 @@
   "plugins": {
     "supabase": {
       "enabled": true
+    },
+    "cursor-sdk": {
+      "enabled": true
     }
   }
 }

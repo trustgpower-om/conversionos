@@ -1,4 +1,6 @@
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
+
+import type { Database } from '@/lib/supabase/types'
 
 function publicRequired(
   name: 'NEXT_PUBLIC_SUPABASE_URL' | 'NEXT_PUBLIC_SUPABASE_ANON_KEY',
@@ -11,9 +13,7 @@ function publicRequired(
 }
 
 /** Browser client — anon key only. Safe to import from Client Components. */
-export function createBrowserSupabaseClient() {
-  return createBrowserClient(
-    publicRequired('NEXT_PUBLIC_SUPABASE_URL'),
-    publicRequired('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
-  )
-}
+export const supabaseBrowserClient = createClient<Database>(
+  publicRequired('NEXT_PUBLIC_SUPABASE_URL'),
+  publicRequired('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
+)
