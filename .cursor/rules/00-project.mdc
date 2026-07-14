@@ -1,45 +1,86 @@
 ---
-description: ConversionOS project overview, stack, architecture, and business rules
+description: ConversionOS project definition, architecture layers, stack, and guardrails
 alwaysApply: true
 ---
 
-# ConversionOS
+# ConversionOS — Project Definition
 
-Landing Page Attribution & Payout Platform for a real estate agency.
-Marketing profiles (social accounts) drive traffic to custom landing pages.
-Form submissions become Bitrix24 leads; the system attributes each lead to a profile and calculates payouts.
+## Product definition
+
+ConversionOS is a **conversion operating system**: a domain platform that stores data obtained by attributing factors involved in an ongoing marketing process (real-world intent). It is built from two coupled core stubs and a central attribution store.
+
+- **Stub A — Link generation:** generates URLs as web-trackable objects (clicks tracked as metrics), with infinite regeneration potential, under the same or different domain addresses.
+- **Stub B — Landing creation center:** a mini-Canva-style editor where the app user builds and edits custom campaign landing pages, with in-system web deploy, and adds custom forms that collect visitor data.
+- **Attribution core:** `visits` (clicks) and `leads` (form submissions), tied together by `session_id`.
+
+> "Operating system" here is a product metaphor: ConversionOS is a domain operating system for conversion workflows — it is **not** a literal OS kernel. A native iOS app is a **future client/surface**, not the current build target.
+
+## Conversion flywheel (end vision)
+
+The system is a closed feedback loop, not a one-shot builder:
+
+1. **Create** — in-system: build a custom landing + generate a trackable link (Stub A + Stub B from the UI).
+2. **Deploy** — WEB DEPLOY: the system publishes the landing live on the web, accessible in a browser, hosted under a specific domain address (one of potentially many domains). Performed from within the system's UI.
+3. **Capture** — the landing collects data: clicks → `visits`, form submits → `leads`, tied by `session_id`.
+4. **Measure** — captured data flows back into the system and is displayed as in-product analytics.
+5. **CRM export** — attribution + leads export to the CRM (Bitrix24).
+6. **Loop** — metrics inform the next campaign → new landings → the wheel turns again.
+
+Every step already maps to an architecture layer: Layer 1 services perform deploy/tracking/export; Layer 2 surfaces analytics; Layer 0 stores. The CRM export hook already exists in the schema (`leads.bitrix_lead_id`, `leads.bitrix_deal_id`).
+
+> Deploy model rule: **WEB DEPLOY** = the system enables publishing a landing page live on the web, accessible in a browser, hosted under a specific domain address (among other domains). The landing becomes reachable at a real URL/domain. The system performs this action from within its own UI. (Domain model: **custom domains only** — the user connects their own domain, e.g. `prodaja-nekretnine.rs`, to a landing; no default subdomains. Hosting: the single Next.js app resolves host → landing; custom domains + SSL managed via Vercel.)
+
+## Coupling rule
+
+Stub A and Stub B are interdependent but separate objects: **a link points to a landing; a landing is published through a link.** Neither is useful alone. Build them as distinct concepts that reference each other.
+
+## Architecture layers (levels of awareness)
+
+- **Layer 0 — Kernel:** Supabase schema + storage + RLS + migrations. Single source of truth. Client-agnostic.
+- **Layer 1 — Services / API:** Next.js route handlers + server logic (link generation, visit tracking, lead submission, landing rendering, Bitrix sync). **This is the stable contract** that both the web app and the future iOS app consume.
+- **Layer 2 — Web OS surface:** the two stubs running in the Next.js web app — link generator UI + landing/form builder (Puck). Built now.
+- **Layer 3 — Clients / surfaces:** Web client (now). iOS native app (far future) = a second client of Layer 1, not a rewrite.
+
+> Principle: keep **Layer 0 + Layer 1 client-agnostic** so iOS later is additive. The iOS app should consume stable API routes, never depend on TypeScript types generated for the web app.
 
 ## Stack
 
-- Next.js 14 (App Router, TypeScript)
-- Supabase (PostgreSQL + Auth + Storage + Realtime)
-- Puck (`@measured-co/puck`) for landing editing
-- Tailwind CSS + shadcn/ui
+- Next.js 16 (App Router, TypeScript strict)
+- React 19
+- Tailwind CSS 4
+- Supabase (PostgreSQL + Auth + Storage + Realtime, SSR)
+- Puck (`@measured-co/puck`) for landing editing (Stub B)
+- Bitrix24 (optional CRM sync)
 - pnpm · Vercel
 
-## Architecture
+## Current implementation (what exists today)
 
-- `/app/(dashboard)/` — Protected admin panel (auth required)
-- `/app/l/[profile]/[landing]/` — Public landings (SSR, SEO)
-- `/app/api/track/` — Server-side tracking (visit, lead)
-- `/app/api/webhooks/bitrix/` — Bitrix24 outgoing webhook events
-- `/app/api/leads/` — Lead submission and Bitrix sync
-- `/lib/supabase/` — Supabase clients (server, client, admin)
-- `/lib/bitrix/` — Bitrix24 API wrapper
-- `/lib/puck/` — Puck config and custom blocks
+- Tables: `profiles`, `landing_pages`, `visits`, `leads`, `payout_periods` (see `supabase/migrations/`)
+- Supabase clients: `lib/supabase/{server,client,admin}.ts` (typed with `Database`)
+- Env validation: `lib/env.ts` (server-only, fail-fast)
+- Generated types: `lib/supabase/types.ts`
+- Migration: `supabase/migrations/20260714000000_init_core_schema.sql`
+- Public read RLS enabled on all existing tables
 
-## Core Entities
+## Planned core modules (not yet built — do NOT assume they exist)
 
-- **Profile** — Marketing account; `slug` in URLs; `commission_rate`
-- **Landing** — Page at `/l/{profile_slug}/{landing_slug}`; Puck JSON blocks
-- **Visit** — Pageview; `session_id`, referrer, device
-- **Lead** — Form submit; `bitrix_lead_id`, optional `bitrix_deal_id`
-- **Payout** — Per profile per period from converted leads × `deal_value` × `commission_rate`
+> Before querying any table, check `lib/supabase/types.ts` and `supabase/migrations/`. Do not write code against tables that are only listed here as "planned".
 
-## Key Business Rules
+- `links` — first-class trackable link objects (Stub A): regeneratable, multi-domain, click metrics
+- `domains` — custom domain support, **custom domains only** (no default subdomains): the user connects their own domain to a landing; host resolver maps host → landing; SSL + custom-domain flow via Vercel
+- landing publish/versioning — draft/published states and content versioning for landings
+- form builder + versioned submissions (MVP uses `landing_pages.form_fields` jsonb)
+- builder media storage — Supabase Storage for images/assets
+- analytics views
+- auth / ownership / tenancy — `profiles` are marketing accounts, not app users; app users/accounts/workspaces come later
+- payouts — optional affiliate module (real-estate commission is one use case, not the product definition)
 
-- Every visit to `/l/{profile}/{landing}` creates a Visit before render
-- Every form submit creates a Lead AND calls Bitrix `crm.lead.add`
-- Lead stores `session_id` (links Visit → Profile)
-- On Bitrix `ONCRMDEALUPDATE` with stage WON: find Lead by `bitrix_lead_id`, mark converted
-- Payout = `SUM(deal_value) × commission_rate` for converted leads in the period, per profile
+## Guardrails
+
+- Schema changes only through migration files in `supabase/migrations/`; never edit existing migrations or `types.ts` by hand.
+- `service_role` (admin client) is server-only via `server-only`; never import into client components or `'use client'` modules.
+- RLS enabled on all tables; public reads where needed, writes done via service_role on the server.
+- Always use explicit `.select('col1, col2, ...)` — never `.select('*')` in production.
+- Hash IPs (SHA-256 + `IP_SALT`) before storage; never store raw IPs.
+- Env via `lib/env.ts`; secrets (`service_role`, Bitrix, salt) are never `NEXT_PUBLIC_*`.
+- Check `lib/supabase/types.ts` and migrations before assuming any table/column exists.
