@@ -14,7 +14,7 @@ export default async function LandingPage({ params }: Props) {
   const { data } = await supabaseAdminClient
     .from('landing_pages')
     .select(
-      'id, slug, title, headline, subheadline, hero_image_url, cta_text, color_primary',
+      'id, profile_id, slug, title, headline, subheadline, hero_image_url, cta_text, color_primary',
     )
     .eq('slug', slug)
     .eq('is_active', true)
@@ -27,7 +27,10 @@ export default async function LandingPage({ params }: Props) {
 
   return (
     <>
-      <TrackingProvider landingPageId={page.id} />
+      <TrackingProvider
+        profileId={page.profile_id ?? undefined}
+        landingPageId={page.id}
+      />
       <div className="flex flex-1 flex-col items-center bg-zinc-50 dark:bg-black">
         {/* Hero */}
         <section
@@ -50,7 +53,7 @@ export default async function LandingPage({ params }: Props) {
           )}
           <a
             href="#lead-form"
-            data-track-id="hero-cta"
+            data-track-id="cta-primary"
             data-track-label={page.cta_text ?? 'CTA'}
             className="inline-flex h-12 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-200"
           >

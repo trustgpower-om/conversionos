@@ -12,6 +12,7 @@ export async function GET(_request: Request, { params }: Props) {
     .from('landing_pages')
     .select('id, slug, title')
     .eq('slug', slug)
+    .eq('is_active', true)
     .limit(1)
 
   const page = landing?.[0]
@@ -24,7 +25,7 @@ export async function GET(_request: Request, { params }: Props) {
   // views: visits attributed to this landing
   const viewsRes = await trackingClient
     .from('visits')
-    .select('*', { count: 'exact', head: true })
+    .select('id', { count: 'exact', head: true })
     .eq('landing_page_id', id)
 
   // sessions for this landing — click events attribute via visit_session_id -> visits.session_id
@@ -38,7 +39,7 @@ export async function GET(_request: Request, { params }: Props) {
   if (sessionIds.length > 0) {
     const clicksRes = await trackingClient
       .from('visit_events')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('event_type', 'click')
       .in('visit_session_id', sessionIds)
     clicks = clicksRes.count ?? 0
@@ -46,7 +47,7 @@ export async function GET(_request: Request, { params }: Props) {
 
   const leadsRes = await supabaseAdminClient
     .from('leads')
-    .select('*', { count: 'exact', head: true })
+    .select('id', { count: 'exact', head: true })
     .eq('landing_page_id', id)
 
   return Response.json({
