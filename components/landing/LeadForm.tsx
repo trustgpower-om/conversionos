@@ -2,14 +2,31 @@
 
 import { useState, type FormEvent } from 'react'
 
+import type { FormFieldDef } from '@/lib/builder/types'
 import { getOrCreateSessionId } from '@/lib/tracking/client'
 
 type LeadFormProps = {
   slug: string
   landingPageId: string
+  fields?: FormFieldDef[]
+  trackId?: string
+  submitLabel?: string
 }
 
-export function LeadForm({ slug, landingPageId }: LeadFormProps) {
+const DEFAULT_FIELDS: FormFieldDef[] = [
+  { name: 'name', label: 'Ime', type: 'text', required: true, placeholder: 'Vaše ime' },
+  { name: 'phone', label: 'Telefon', type: 'tel', required: true, placeholder: '+381 …' },
+  { name: 'email', label: 'Email', type: 'email', placeholder: 'ime@primer.rs' },
+  { name: 'message', label: 'Poruka', type: 'textarea', placeholder: 'Opciono' },
+]
+
+export function LeadForm({
+  slug,
+  landingPageId,
+  fields = DEFAULT_FIELDS,
+  trackId = 'lead-form',
+  submitLabel = 'Pošalji upit',
+}: LeadFormProps) {
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>(
     'idle',
   )
@@ -55,46 +72,40 @@ export function LeadForm({ slug, landingPageId }: LeadFormProps) {
 
   return (
     <form
-      data-track-id="lead-form"
+      data-track-id={trackId}
       onSubmit={handleSubmit}
       className="flex w-full max-w-md flex-col gap-3"
     >
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Ime</span>
-        <input name="name" required placeholder="Vaše ime" className={inputClass} />
-      </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          Telefon
-        </span>
-        <input name="phone" required placeholder="+381 …" className={inputClass} />
-      </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Email</span>
-        <input
-          name="email"
-          type="email"
-          placeholder="ime@primer.rs"
-          className={inputClass}
-        />
-      </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          Poruka
-        </span>
-        <textarea
-          name="message"
-          rows={2}
-          placeholder="Opciono"
-          className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:focus:border-zinc-100"
-        />
-      </label>
+      {fields.map((field) => (
+        <label key={field.name} className="flex flex-col gap-1">
+          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            {field.label}
+          </span>
+          {field.type === 'textarea' ? (
+            <textarea
+              name={field.name}
+              required={field.required}
+              placeholder={field.placeholder}
+              rows={2}
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:focus:border-zinc-100"
+            />
+          ) : (
+            <input
+              name={field.name}
+              type={field.type}
+              required={field.required}
+              placeholder={field.placeholder}
+              className={inputClass}
+            />
+          )}
+        </label>
+      ))}
       <button
         type="submit"
         disabled={status === 'submitting'}
         className="mt-2 h-11 rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-zinc-700 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
       >
-        {status === 'submitting' ? 'Slanje…' : 'Pošalji upit'}
+        {status === 'submitting' ? 'Slanje…' : submitLabel}
       </button>
       {status === 'success' && (
         <p className="text-sm text-emerald-600">
