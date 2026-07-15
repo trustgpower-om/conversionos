@@ -36,25 +36,33 @@ export async function POST(request: Request) {
   }
 
   // Resolve landing_page_id from the slug server-side (do not trust client id).
-  let landingPageId: string | null = null
+  // If the slug is missing or no active landing matches, refuse — a lead with
+  // null landing_page_id would never show up in per-landing metrics.
   const slug = asString(body.slug)
-  if (slug) {
-    const { data } = await supabaseAdminClient
-      .from('landing_pages')
-      .select('id')
-      .eq('slug', slug)
-      .eq('is_active', true)
-      .limit(1)
-    landingPageId = data?.[0]?.id ?? null
+  if (!slug) {
+    return Response.json({ error: 'slug is required' }, { status: 400 })
+  }
+  const { data } = await supabaseAdminClient
+    .from('landing_pages')
+    .select('id')
+    .eq('slug', slug)
+    .eq('is_active', true)
+    .limit(1)
+  const landingPageId = data?.[0]?.id ?? null
+  if (!landingPageId) {
+    return Response.json({ error: 'active landing not found for slug' }, { status: 404 })
   }
 
   // Safety: ensure the visit row exists (leads.session_id FK -> visits.session_id).
-  await trackingClient
+  const { error: visitError } = await trackingClient
     .from('visits')
     .upsert(
-      { session_id: body.session_id, landing_page_id: landingPageId ?? undefined },
+      { session_id: body.session_id, landing_page_id: landingPageId },
       { onConflict: 'session_id' },
     )
+  if (visitError) {
+    return Response.json({ error: visitError.message }, { status: 500 })
+  }
 
   const { error } = await supabaseAdminClient.from('leads').insert({
     session_id: body.session_id,
