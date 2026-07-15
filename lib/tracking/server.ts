@@ -108,17 +108,27 @@ export async function insertPageview(input: {
   device_type?: string
   ip_hash?: string | null
 }): Promise<{ error: string | null }> {
-  const { error } = await trackingClient.from('visits').upsert(
-    {
-      session_id: input.session_id,
-      profile_id: input.profile_id ?? null,
-      landing_page_id: input.landing_page_id ?? null,
-      referrer: input.referrer ?? null,
-      device_type: input.device_type ?? null,
-      ip_hash: input.ip_hash ?? null,
-    },
-    { onConflict: 'session_id', ignoreDuplicates: true },
-  )
+  // Build the row so optional FK fields (landing_page_id, profile_id) are written
+  // ONLY when provided. Otherwise a later pageview without them would null-out
+  // attribution that an earlier pageview set on the same session.
+  const row: VisitsInsert = {
+    session_id: input.session_id,
+    referrer: input.referrer ?? null,
+    device_type: input.device_type ?? null,
+    ip_hash: input.ip_hash ?? null,
+  }
+  if (input.profile_id) {
+    row.profile_id = input.profile_id
+  }
+  if (input.landing_page_id) {
+    row.landing_page_id = input.landing_page_id
+  }
+
+  // Merge on conflict (no ignoreDuplicates) so an existing session picks up the
+  // landing_page_id from a later pageview. Without this, metrics-by-landing stay empty.
+  const { error } = await trackingClient.from('visits').upsert(row, {
+    onConflict: 'session_id',
+  })
 
   return { error: error?.message ?? null }
 }
