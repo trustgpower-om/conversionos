@@ -1,4 +1,4 @@
-import { insertVisitEvent } from '@/lib/tracking/server'
+import { ensureVisitSession, insertVisitEvent } from '@/lib/tracking/server'
 import { isPlainObject, isUuid, isVisitEventType } from '@/lib/tracking/validation'
 
 type EventRequestBody = {
@@ -30,6 +30,12 @@ export async function POST(request: Request) {
 
   if (body.event_payload !== undefined && !isPlainObject(body.event_payload)) {
     return Response.json({ error: 'event_payload must be a plain object' }, { status: 400 })
+  }
+
+  // Events can race ahead of pageview (fire-and-forget). visit_events FK requires a visits row.
+  const { error: visitError } = await ensureVisitSession(body.session_id)
+  if (visitError) {
+    return Response.json({ error: visitError }, { status: 500 })
   }
 
   const { error } = await insertVisitEvent({

@@ -133,6 +133,18 @@ export async function insertPageview(input: {
   return { error: error?.message ?? null }
 }
 
+/** Ensures a visits row exists before visit_events insert (FK: visit_session_id → session_id). */
+export async function ensureVisitSession(
+  session_id: string,
+): Promise<{ error: string | null }> {
+  const { error } = await trackingClient.from('visits').upsert(
+    { session_id },
+    { onConflict: 'session_id', ignoreDuplicates: true },
+  )
+
+  return { error: error?.message ?? null }
+}
+
 export async function insertVisitEvent(input: {
   visit_session_id: string
   event_type: VisitEventType
