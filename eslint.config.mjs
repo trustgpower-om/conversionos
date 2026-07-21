@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Electron main/preload are CommonJS (.cjs) and excluded from the
+    // Next/TS lint rules (e.g. require() imports).
+    "electron/**",
   ]),
 ]);
 

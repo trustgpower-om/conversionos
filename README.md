@@ -61,6 +61,41 @@ pnpm dev
 
 ---
 
+## Run as a local desktop app (Electron)
+
+You can launch ConversionOS as a native desktop window (Electron) that opens
+straight to the Pages UI (`/pages`).
+
+### Prerequisites
+
+- [pnpm](https://pnpm.io/) (package manager)
+- Node.js 20+
+
+### Pokretanje
+
+```bash
+pnpm install
+pnpm electron:dev
+```
+
+What happens:
+
+1. Starts the Next.js **dev** server on `http://localhost:4321`.
+2. Waits for it to be ready (via `wait-on`).
+3. Opens an Electron window (1440×900) pointed at `http://localhost:4321/pages`.
+
+External links (`target=_blank`, non-localhost) open in your default OS browser.
+Closing the window shuts down the bundled Next dev server and quits the app.
+
+> **Why dev mode?** The app runs `next dev` rather than `next build`/`next start`
+> because a full production build currently fails on the pre-existing
+> `/api/leads/submit` route (missing env vars). Once that route is fixed and
+> `next build` succeeds, `pnpm electron:dist` (electron-builder, targets:
+> Windows NSIS / macOS DMG / Linux AppImage) can produce packaged installers.
+> The `electron:build` script is a placeholder until then.
+
+---
+
 ## Environment varijable
 
 Kopirati `.env.example` u `.env.local` i popuniti:

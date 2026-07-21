@@ -2,12 +2,16 @@
   "name": "conversionos",
   "version": "0.1.0",
   "private": true,
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "electron:dev": "concurrently -k -n NEXT,ELEC -c magenta,blue \"pnpm dev --port 4321\" \"wait-on http://localhost:4321 && electron .\"",
+    "electron:build": "echo 'next build currently blocked by /api/leads/submit env — skipping' && exit 0",
+    "electron:dist": "electron-builder"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
@@ -22,9 +26,44 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^10.0.3",
+    "electron": "^31.7.7",
+    "electron-builder": "^26.15.3",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wait-on": "^9.0.10"
+  },
+  "build": {
+    "appId": "com.trustgpower.conversionos",
+    "productName": "ConversionOS",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**",
+      "app/**",
+      "lib/**",
+      "public/**",
+      "next.config.ts",
+      "package.json",
+      "pnpm-lock.yaml"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ]
+    }
   }
 }
