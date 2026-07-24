@@ -9,7 +9,8 @@
 
 -- 1) Auth korisnik (bound: profiles.id = auth.uid()).
 --    crypt()/gen_salt() iz pgcrypto; GoTrue prihvata bcrypt hash.
---    DO blok: ako auth.users šema odudara, seed ne puca — samo preskoči.
+--    auth.users u svom DO bloku — ako šema odudara, seed ne puca, samo preskoci.
+--    Odvojeno od identities bloka da greška u identities ne roll-back-uje user insert.
 do $$
 begin
   insert into auth.users (
@@ -25,12 +26,18 @@ begin
     'marko@conversionos.local',
     crypt('conversionos', gen_salt('bf')),
     now(), now(), now(), now(), now(),
-    '{}'::jsonb, '{}'::jsonb, false, null, null
+    '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+    false, null, null
   )
   on conflict (id) do nothing;
+exception when others then
+  raise notice 'Seed: auth.users insert preskocen — %', SQLERRM;
+end $$;
 
-  -- identities row — GoTrue prihvata i password sign-in bez njega, ali pun
-  -- pattern je sigurniji na novijim auth šemama.
+-- identities row — pun pattern, u posebnom bloku da ne ometa auth.users.
+-- GoTrue password sign-in radi i bez njega, ali novije šeme ga očekuju.
+do $$
+begin
   insert into auth.identities (
     id, user_id, identity_id, provider, identity_data, last_sign_in_at, created_at, updated_at
   )
@@ -44,7 +51,7 @@ begin
   )
   on conflict (id) do nothing;
 exception when others then
-  raise notice 'Seed: auth.users/identities insert preskocen — %', SQLERRM;
+  raise notice 'Seed: auth.identities insert preskocen — %', SQLERRM;
 end $$;
 
 -- 2) Profil vezan za tog auth korisnika (profiles.id = auth.users.id).

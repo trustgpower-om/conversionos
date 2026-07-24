@@ -27,9 +27,9 @@ export function LeadForm({
   trackId = 'lead-form',
   submitLabel = 'Pošalji upit',
 }: LeadFormProps) {
-  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>(
-    'idle',
-  )
+  const [status, setStatus] = useState<
+    'idle' | 'submitting' | 'success' | 'success-local' | 'error'
+  >('idle')
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -60,7 +60,15 @@ export function LeadForm({
         return
       }
 
-      setStatus('success')
+      // Lead je uvek sačuvan lokalno. Ako Bitrix nije sinhronizovan
+      // (nije konfigurisan ili je pukao) — ne prikazujemo lažni pun uspeh:
+      // posetilac zna da je upit primljen, ali da sinhronizacija nije prošla.
+      const body = (await res.json()) as { bitrix?: string }
+      if (body.bitrix === 'synced') {
+        setStatus('success')
+      } else {
+        setStatus('success-local')
+      }
       form.reset()
     } catch {
       setStatus('error')
@@ -110,6 +118,11 @@ export function LeadForm({
       {status === 'success' && (
         <p className="text-sm text-emerald-600">
           Hvala! Agent vas kontaktira uskoro.
+        </p>
+      )}
+      {status === 'success-local' && (
+        <p className="text-sm text-amber-600">
+          Upit je primljen, ali nije sinhronizovan sa Bitrixom — agent će ga videti u panelu.
         </p>
       )}
       {status === 'error' && (
