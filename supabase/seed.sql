@@ -1,58 +1,79 @@
 -- ConversionOS — lokalni seed podaci
--- Pokreće se automatski nakon migracija pri `supabase db reset`
--- (vidi [db].seed u config.toml / `supabase start`).
--- RLS se za seed ne primenjuje (seed radi kao superuser).
+-- Pokreće se automatski nakon migracija pri `supabase db reset` / `supabase start`.
+--
+-- Kreira PONOVLJIV dev fixture: auth korisnik + profil + aktivan landing 'apartmani-13',
+-- tako da login → /panel/apartmani-13 radi bez ručnog podešavanja.
+--
+-- Dev login:  marko@conversionos.local  /  conversionos
+-- (U produkciji koristi prave korisnike — ovo je samo za lokalni dev.)
 
--- 1) Demo agent / profil
-INSERT INTO profiles (slug, full_name, email, phone, commission_rate)
-VALUES (
+-- 1) Auth korisnik (bound: profiles.id = auth.uid()).
+--    crypt()/gen_salt() iz pgcrypto; GoTrue prihvata bcrypt hash.
+--    DO blok: ako auth.users šema odudara, seed ne puca — samo preskoči.
+do $$
+begin
+  insert into auth.users (
+    id, instance_id, aud, role, email, encrypted_password,
+    email_confirmed_at, confirmed_at, created_at, updated_at,
+    last_sign_in_at, raw_app_meta_data, raw_user_meta_data,
+    is_sso_user, phone, phone_confirmed_at
+  )
+  values (
+    '11111111-1111-1111-1111-111111111111',
+    '00000000-0000-0000-0000-000000000000',
+    'authenticated', 'authenticated',
+    'marko@conversionos.local',
+    crypt('conversionos', gen_salt('bf')),
+    now(), now(), now(), now(), now(),
+    '{}'::jsonb, '{}'::jsonb, false, null, null
+  )
+  on conflict (id) do nothing;
+exception when others then
+  raise notice 'Seed: auth.users insert preskočen — %', SQLERRM;
+end $$;
+
+-- 2) Profil vezan za tog auth korisnika (profiles.id = auth.users.id).
+insert into profiles (id, slug, full_name, email, phone, commission_rate)
+values (
+  '11111111-1111-1111-1111-111111111111',
   'marko-demo',
   'Marko Obradovic',
-  'demo@conversionos.local',
+  'marko@conversionos.local',
   '+381600000000',
   0.03
 )
-ON CONFLICT (slug) DO NOTHING;
+on conflict (id) do update set
+  email = excluded.email,
+  phone = excluded.phone;
 
--- 2) Demo landing page (referencira profil preko slug-a)
-INSERT INTO landing_pages (
-  profile_id, slug, title, headline, subheadline, cta_text, color_primary
+-- 3) Aktivan landing 'apartmani-13' (canonical demo slug — koristi ga login + flows).
+insert into landing_pages (
+  profile_id, slug, title, headline, subheadline, cta_text, color_primary, is_active
 )
-SELECT
+select
   p.id,
-  'novi-beograd-extend',
-  'Novi Beograd — stanovi u prodaji',
-  'Pronađite svoj novi dom',
+  'apartmani-13',
+  'Stanovi — Novi Beograd',
+  'Pronađite svoj savršen stan',
   'Od 85.000€ u Bloku 61',
   'Zatraži informacije',
-  '#1a1a2e'
-FROM profiles p
-WHERE p.slug = 'marko-demo'
-ON CONFLICT (profile_id, slug) DO NOTHING;
+  '#1a1a2e',
+  true
+from profiles p
+where p.slug = 'marko-demo'
+on conflict (profile_id, slug) do update set
+  headline = excluded.headline,
+  is_active = true;
 
--- 3) Demo poseta (visit)
-INSERT INTO visits (session_id, profile_id, landing_page_id, referrer, device_type)
-SELECT
-  gen_random_uuid(),
+-- 4) Demo poseta (visit) — da panel metrike imaju šta da pokažu odmah.
+insert into visits (session_id, profile_id, landing_page_id, referrer, device_type)
+select
+  '22222222-2222-2222-2222-222222222222',
   p.id,
   lp.id,
   'https://facebook.com',
   'mobile'
-FROM profiles p
-JOIN landing_pages lp ON lp.profile_id = p.id
-WHERE p.slug = 'marko-demo' AND lp.slug = 'novi-beograd-extend'
-ON CONFLICT (session_id) DO NOTHING;
-
--- 4) Demo lead
-INSERT INTO leads (profile_id, landing_page_id, name, phone, email, message, status)
-SELECT
-  p.id,
-  lp.id,
-  'Jelena Petrović',
-  '+381611111111',
-  'jelena@example.com',
-  'Zanima me dvosoban stan na 3. spratu.',
-  'new'
-FROM profiles p
-JOIN landing_pages lp ON lp.profile_id = p.id
-WHERE p.slug = 'marko-demo' AND lp.slug = 'novi-beograd-extend';
+from profiles p
+join landing_pages lp on lp.profile_id = p.id
+where p.slug = 'marko-demo' and lp.slug = 'apartmani-13'
+on conflict (session_id) do nothing;

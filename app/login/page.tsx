@@ -29,7 +29,7 @@ export default function LoginPage() {
       return
     }
 
-    router.push('/builder/apartmani-13')
+    router.push('/panel/apartmani-13')
     router.refresh()
   }
 
