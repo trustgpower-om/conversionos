@@ -1,16 +1,23 @@
 import { supabaseAdminClient } from '@/lib/supabase/admin'
 import { trackingClient } from '@/lib/tracking/server'
+import { requireAuthenticatedUser } from '@/lib/auth/require-session'
 
 type Props = {
   params: Promise<{ slug: string }>
 }
 
+// Prethodno javna (curi count leadova) — sada auth-gated + ownership.
 export async function GET(_request: Request, { params }: Props) {
+  const user = await requireAuthenticatedUser()
+  if (!user) {
+    return Response.json({ error: 'unauthorized' }, { status: 401 })
+  }
+
   const { slug } = await params
 
   const { data: landing } = await supabaseAdminClient
     .from('landing_pages')
-    .select('id, slug, title')
+    .select('id, profile_id, title')
     .eq('slug', slug)
     .eq('is_active', true)
     .limit(1)
@@ -20,15 +27,19 @@ export async function GET(_request: Request, { params }: Props) {
     return Response.json({ error: 'landing not found' }, { status: 404 })
   }
 
+  const isOwner = page.profile_id === null || page.profile_id === user.id
+  if (!isOwner) {
+    return Response.json({ error: 'forbidden' }, { status: 403 })
+  }
+
   const id = page.id
 
-  // views: visits attributed to this landing
+  // views: posete atribuirane ovom landingu
   const viewsRes = await trackingClient
     .from('visits')
     .select('id', { count: 'exact', head: true })
     .eq('landing_page_id', id)
 
-  // sessions for this landing — click events attribute via visit_session_id -> visits.session_id
   const sessionsRes = await trackingClient
     .from('visits')
     .select('session_id')
@@ -50,11 +61,16 @@ export async function GET(_request: Request, { params }: Props) {
     .select('id', { count: 'exact', head: true })
     .eq('landing_page_id', id)
 
+  const views = viewsRes.count ?? 0
+  const leads = leadsRes.count ?? 0
+  const conversionRate = views > 0 ? leads / views : 0
+
   return Response.json({
-    slug: page.slug,
+    slug,
     title: page.title,
-    views: viewsRes.count ?? 0,
+    views,
     clicks,
-    leads: leadsRes.count ?? 0,
+    leads,
+    conversionRate,
   })
 }
