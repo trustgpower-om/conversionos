@@ -28,9 +28,9 @@ export async function GET(_request: Request, { params }: Props) {
   }
 
   // Ownership: vlasnik landinga (profile_id === auth.uid()).
-  // Demo landingi sa null profile_id ostaju pristupačni svakom ulogovanom
-  // (konzistentno sa canEditLanding) dok se RLS ownership ne dovrši.
-  const isOwner = page.profile_id === null || page.profile_id === user.id
+  // leadovi sadrže PII (ime/telefon) čitane preko service_role —
+  // strogi ownership, bez null fallback-a. Seed vezuje profile_id na auth uid.
+  const isOwner = page.profile_id === user.id
   if (!isOwner) {
     return Response.json({ error: 'forbidden' }, { status: 403 })
   }
@@ -38,7 +38,7 @@ export async function GET(_request: Request, { params }: Props) {
   const { data: leads, error } = await supabaseAdminClient
     .from('leads')
     .select(
-      'id, name, phone, email, message, status, bitrix_lead_id, created_at',
+      'id, name, phone, email, message, status, bitrix_lead_id, bitrix_sync_status, created_at',
     )
     .eq('landing_page_id', page.id)
     .order('created_at', { ascending: false })

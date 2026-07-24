@@ -28,8 +28,23 @@ begin
     '{}'::jsonb, '{}'::jsonb, false, null, null
   )
   on conflict (id) do nothing;
+
+  -- identities row — GoTrue prihvata i password sign-in bez njega, ali pun
+  -- pattern je sigurniji na novijim auth šemama.
+  insert into auth.identities (
+    id, user_id, identity_id, provider, identity_data, last_sign_in_at, created_at, updated_at
+  )
+  values (
+    '11111111-1111-1111-1111-111111111111',
+    '11111111-1111-1111-1111-111111111111',
+    '11111111-1111-1111-1111-111111111111',
+    'email',
+    '{"sub":"11111111-1111-1111-1111-111111111111","email":"marko@conversionos.local","email_verified":true}'::jsonb,
+    now(), now(), now()
+  )
+  on conflict (id) do nothing;
 exception when others then
-  raise notice 'Seed: auth.users insert preskočen — %', SQLERRM;
+  raise notice 'Seed: auth.users/identities insert preskocen — %', SQLERRM;
 end $$;
 
 -- 2) Profil vezan za tog auth korisnika (profiles.id = auth.users.id).

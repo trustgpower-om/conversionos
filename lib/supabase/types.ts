@@ -74,6 +74,7 @@ export type Database = {
         Row: {
           bitrix_deal_id: string | null
           bitrix_lead_id: string | null
+          bitrix_sync_status: string | null
           converted_at: string | null
           created_at: string | null
           deal_value: number | null
@@ -90,6 +91,7 @@ export type Database = {
         Insert: {
           bitrix_deal_id?: string | null
           bitrix_lead_id?: string | null
+          bitrix_sync_status?: string | null
           converted_at?: string | null
           created_at?: string | null
           deal_value?: number | null
@@ -106,6 +108,7 @@ export type Database = {
         Update: {
           bitrix_deal_id?: string | null
           bitrix_lead_id?: string | null
+          bitrix_sync_status?: string | null
           converted_at?: string | null
           created_at?: string | null
           deal_value?: number | null

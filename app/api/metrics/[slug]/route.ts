@@ -27,7 +27,8 @@ export async function GET(_request: Request, { params }: Props) {
     return Response.json({ error: 'landing not found' }, { status: 404 })
   }
 
-  const isOwner = page.profile_id === null || page.profile_id === user.id
+  // Strogi ownership — metrike (count leadova) curi ako su javne.
+  const isOwner = page.profile_id === user.id
   if (!isOwner) {
     return Response.json({ error: 'forbidden' }, { status: 403 })
   }

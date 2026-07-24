@@ -255,7 +255,9 @@ export const SYSTEM_FLOWS: Flow[] = [
 export async function resolveFlowContext(): Promise<FlowContext> {
   const sessionId = crypto.randomUUID()
   const slug = 'apartmani-13'
-  let landingId = '2f68ec4c-6029-4174-a37a-e776878cc24b'
+  // Runtime resolution je autoritativno (preko /api/pages/[slug]);
+  // stari hardkodovani UUID je uklonjen jer seed kreira novi id pri resetu.
+  let landingId = ''
 
   try {
     const res = await fetch(`/api/pages/${encodeURIComponent(slug)}`)
@@ -266,7 +268,7 @@ export async function resolveFlowContext(): Promise<FlowContext> {
       }
     }
   } catch {
-    // fallback landing id
+    // bez runtime landing id — tokovi koji ga koriste će gracefulno failovati
   }
 
   return { landingId, sessionId, slug }

@@ -82,6 +82,7 @@ export async function POST(request: Request) {
       email: asString(body.email),
       message: asString(body.message),
       status: 'new',
+      bitrix_sync_status: 'pending',
     })
     .select('id')
     .limit(1)
@@ -108,23 +109,48 @@ export async function POST(request: Request) {
     bitrixStatus = 'synced'
     await supabaseAdminClient
       .from('leads')
-      .update({ bitrix_lead_id: bitrix.bitrixLeadId })
+      .update({ bitrix_lead_id: bitrix.bitrixLeadId, bitrix_sync_status: 'synced' })
       .eq('id', leadId)
   } else if (bitrix.reason === 'not_configured') {
     bitrixStatus = 'not_configured'
+    await supabaseAdminClient
+      .from('leads')
+      .update({ bitrix_sync_status: 'not_configured' })
+      .eq('id', leadId)
   } else {
-    // http_error | api_error — loguj; agent vidi status u panelu.
+    // http_error | api_error — perzistiraj status + loguj; agent VIDI neuspeh.
+    await supabaseAdminClient
+      .from('leads')
+      .update({ bitrix_sync_status: 'failed' })
+      .eq('id', leadId)
     console.error('[bitrix] lead sync failed', { leadId, ...bitrix })
   }
 
   // 3) Realtime signal panelu da je stigao novi lead — broadcast bez PII.
   //    Panel ga koristi kao okidač za re-fetch /api/leads/list (koji nosi PII
   //    preko auth-gated service_role rute), ne kao prenos PII.
+  //    Broadcast zahteva da publisher bude subscribed pre slanja.
   try {
-    await supabaseAdminClient.channel(`leads:${slug}`).send({
-      type: 'broadcast',
-      event: 'new_lead',
-      payload: { slug },
+    const channel = supabaseAdminClient.channel(`leads:${slug}`)
+    await new Promise<void>((resolve) => {
+      let settled = false
+      const finish = () => {
+        if (settled) return
+        settled = true
+        supabaseAdminClient.removeChannel(channel)
+        resolve()
+      }
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          channel
+            .send({ type: 'broadcast', event: 'new_lead', payload: { slug } })
+            .then(finish, finish)
+          setTimeout(finish, 500)
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          finish()
+        }
+      })
+      setTimeout(finish, 2000)
     })
   } catch {
     // Realtime je "nice to have" — ne sme oboriti lead capture.
