@@ -1,0 +1,79 @@
+# Supabase lokalni projekat — ConversionOS
+# Generisano za lokalni development (`supabase start`).
+# Dokumentacija: https://supabase.com/docs/guides/local-development
+
+project_id = "conversionos"
+
+[api]
+enabled = true
+# API gateway (Kong) — ovde Next.js aplikacija razgovara sa Supabase.
+# NEXT_PUBLIC_SUPABASE_URL = http://127.0.0.1:54321
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+# Direktna Postgres konekcija (za Drizzle / psql / GUI klijente).
+# connection string: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.pooler]
+enabled = true
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 15
+max_client_conn = 100
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+# Supabase Studio UI — otvori u browseru da pregledaš podatke.
+# http://127.0.0.1:54323
+port = 52343
+api_url = "http://127.0.0.1"
+
+[inbucket]
+enabled = true
+port = 54324
+sender_port = 9000
+smtp_port = 54325
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["https://127.0.0.1:3000"]
+jwt_expiry = 3600
+refresh_token_rotation_enabled = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+enable_anonymous_sign_ins = false
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[auth.external.apple]
+enabled = false
+[auth.external.google]
+enabled = false
+[auth.external.github]
+enabled = false
+
+[edge_runtime]
+enabled = true
+
+[functions]
+enabled = true
+
+[analytics]
+enabled = false

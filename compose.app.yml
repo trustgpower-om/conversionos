@@ -1,0 +1,36 @@
+# ============================================================
+# ConversionOS — OPTIONAL: produkcioni image smoke test
+# ------------------------------------------------------------
+# Ovo NIJE zamena za `supabase start` + `pnpm dev` (to je lokalni dev tok).
+# Ovaj compose samo pokreće izgrađeni produkcioni image i povezuje ga na
+# tvoj Supabase projekat (lokalni ILI cloud) preko env varijabli.
+#
+# Upotreba:
+#   docker build -t conversionos .
+#   docker compose -f compose.app.yml up
+#
+# Env varijable se čitaju iz .env / .env.local:
+#   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
+#   SUPABASE_SERVICE_ROLE_KEY, IP_SALT, (BITRIX_* opcionalno)
+#
+# NAPOMENA: unutar kontejnera, NEXT_PUBLIC_* vrednosti se "upeku" u browser
+# bundle pri build-u. Zato ih proslediš preko --build-arg ili .env u trenutku
+# build-a ako želiš da se promena odrazi na client kod.
+# ============================================================
+services:
+  web:
+    image: conversionos
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: conversionos-web
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      IP_SALT: ${IP_SALT}
+      BITRIX_WEBHOOK_URL: ${BITRIX_WEBHOOK_URL:-}
+      BITRIX_WEBHOOK_SECRET: ${BITRIX_WEBHOOK_SECRET:-}
+    restart: unless-stopped

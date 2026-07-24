@@ -38,6 +38,9 @@ cp .env.example .env.local   # popuni Supabase i Bitrix24 kredencijale
 pnpm install
 ```
 
+> **Lokalni dev sa Supabase + Docker** — vidi [docs/local-development.md](./docs/local-development.md)
+> za kompletan tok: `supabase start` (ceo lokalni stek) + `pnpm dev`, plus produkcioni `Dockerfile`.
+
 ### Supabase setup
 
 ```bash

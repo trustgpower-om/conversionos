@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.gitignore
+.env*
+!.env.example
+!.env.local.example
+*.md
+docs
+.cursor
+coverage
+*.tsbuildinfo
+.DS_Store
+.pnpm-store
