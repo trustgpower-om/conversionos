@@ -1,6 +1,7 @@
 import { supabaseAdminClient } from '@/lib/supabase/admin'
 import { trackingClient } from '@/lib/tracking/server'
 import { isUuid } from '@/lib/tracking/validation'
+import { createBitrixLead } from '@/lib/bitrix/client'
 
 type LeadRequestBody = {
   session_id?: unknown
@@ -35,48 +36,102 @@ export async function POST(request: Request) {
     return Response.json({ error: 'name and phone are required' }, { status: 400 })
   }
 
-  // Resolve landing_page_id from the slug server-side (do not trust client id).
-  // If the slug is missing or no active landing matches, refuse — a lead with
-  // null landing_page_id would never show up in per-landing metrics.
+  // Resolve landing id + profile_id server-side (ne veruj klijentu).
+  // profile_id se upisuje na lead — bez toga per-agent atribucija puca.
   const slug = asString(body.slug)
   if (!slug) {
     return Response.json({ error: 'slug is required' }, { status: 400 })
   }
-  const { data } = await supabaseAdminClient
+  const { data: landing } = await supabaseAdminClient
     .from('landing_pages')
-    .select('id')
+    .select('id, profile_id')
     .eq('slug', slug)
     .eq('is_active', true)
     .limit(1)
-  const landingPageId = data?.[0]?.id ?? null
+  const landingRow = landing?.[0] ?? null
+  const landingPageId = landingRow?.id ?? null
+  const profileId = landingRow?.profile_id ?? null
   if (!landingPageId) {
     return Response.json({ error: 'active landing not found for slug' }, { status: 404 })
   }
 
-  // Safety: ensure the visit row exists (leads.session_id FK -> visits.session_id).
+  // Safety: visits.session_id FK — osiguraj da visit red postoji.
   const { error: visitError } = await trackingClient
     .from('visits')
     .upsert(
-      { session_id: body.session_id, landing_page_id: landingPageId },
+      {
+        session_id: body.session_id,
+        landing_page_id: landingPageId,
+        profile_id: profileId,
+      },
       { onConflict: 'session_id' },
     )
   if (visitError) {
     return Response.json({ error: visitError.message }, { status: 500 })
   }
 
-  const { error } = await supabaseAdminClient.from('leads').insert({
-    session_id: body.session_id,
-    landing_page_id: landingPageId,
+  // 1) Uvek sačuvaj lead lokalno — nikada ne izgubi lead.
+  const { data: inserted, error } = await supabaseAdminClient
+    .from('leads')
+    .insert({
+      session_id: body.session_id,
+      landing_page_id: landingPageId,
+      profile_id: profileId,
+      name,
+      phone,
+      email: asString(body.email),
+      message: asString(body.message),
+      status: 'new',
+    })
+    .select('id')
+    .limit(1)
+
+  if (error || !inserted?.[0]) {
+    return Response.json({ error: error?.message ?? 'lead insert failed' }, { status: 500 })
+  }
+
+  const leadId = inserted[0].id
+
+  // 2) Bitrix sync — „nema lažnog uspeha": ako je konfigurisan pa pukne,
+  //    lead ostaje sačuvan, ali agent VIDI da sinhronizacija nije prošla
+  //    (status u panel lead-listi + server log). Ako nije konfigurisan,
+  //    to je dev stanje — lead je i dalje sačuvan lokalno.
+  const bitrix = await createBitrixLead({
     name,
     phone,
     email: asString(body.email),
     message: asString(body.message),
-    status: 'new',
   })
 
-  if (error) {
-    return Response.json({ error: error.message }, { status: 500 })
+  let bitrixStatus: 'synced' | 'not_configured' | 'failed' = 'failed'
+  if (bitrix.ok) {
+    bitrixStatus = 'synced'
+    await supabaseAdminClient
+      .from('leads')
+      .update({ bitrix_lead_id: bitrix.bitrixLeadId })
+      .eq('id', leadId)
+  } else if (bitrix.reason === 'not_configured') {
+    bitrixStatus = 'not_configured'
+  } else {
+    // http_error | api_error — loguj; agent vidi status u panelu.
+    console.error('[bitrix] lead sync failed', { leadId, ...bitrix })
   }
 
-  return Response.json({ ok: true }, { status: 201 })
+  // 3) Realtime signal panelu da je stigao novi lead — broadcast bez PII.
+  //    Panel ga koristi kao okidač za re-fetch /api/leads/list (koji nosi PII
+  //    preko auth-gated service_role rute), ne kao prenos PII.
+  try {
+    await supabaseAdminClient.channel(`leads:${slug}`).send({
+      type: 'broadcast',
+      event: 'new_lead',
+      payload: { slug },
+    })
+  } catch {
+    // Realtime je "nice to have" — ne sme oboriti lead capture.
+  }
+
+  return Response.json(
+    { ok: true, lead_id: leadId, bitrix: bitrixStatus },
+    { status: 201 },
+  )
 }
